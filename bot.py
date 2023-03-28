@@ -2,6 +2,7 @@ import json
 from random import randint
 from typing import Literal
 from rolldice import roll_dice
+from random import randint
 import interactions, dotenv, os, re
 
 dotenv.load_dotenv()
@@ -40,26 +41,33 @@ async def ping(ctx: interactions.CommandContext):
 
 
 @bot.command(
-    name="roll_die",
+    name="roll",
     description="Rolls a number of dice",
     scope=1030231553386754188,
 )
+@interactions.option()
 @interactions.option()
 async def roll(
     ctx: interactions.CommandContext,
     dice_notation: str,
     advantage: str = "None",
 ):
+    
     if advantage != "None":
-        smaller_explanation, smaller_total, larger_explanation, larger_total = sorted([roll_dice(dice_notation), roll_dice(dice_notation)])
-        await ctx.send(f"""
+        smaller_total, smaller_explanation, larger_total, larger_explanation = sorted(
+            [roll_dice(dice_notation), roll_dice(dice_notation)]
+        )
+        await ctx.send(
+            f"""
+:game_die: {dice_notation} (With {advantage})
 ~~{smaller_explanation} = {smaller_total}~~
 {larger_explanation} = {larger_total}
 **{larger_total}**
-        """.strip())
+        """.strip()
+        )
     else:
-        explanation, total = roll_dice(dice_notation)
-        await ctx.send(f"{explanation} = {total}")
+        total, explanation = roll_dice(dice_notation)
+        await ctx.send(f":game_die: {dice_notation}\n{explanation} = {total}")
 
 
 data = possible_enemies
@@ -85,7 +93,7 @@ def split_text(text):
 
     new_text = "\n\n".join([" ".join(chunk) for chunk in chunks])
 
-    return new_text
+    return ((((new_text))))
 
 
 @bot.command(
@@ -108,14 +116,14 @@ async def enemy(
             hit_points = monster["Hit Points"]
             speed = monster["Speed"]
             challenge = monster["Challenge"]
-            traits = monster["Traits"]
-            actions = monster["Actions"]
+            traits = monster.get("Traits", "No Traits")
+            actions = monster.get("Actions", "No Actions")
             legendary_actions = monster.get("Legendary Actions", "No Legendary Actions")
             img_url = monster["img_url"]
 
             embed = interactions.Embed(
                 title=f"{name} ({meta})",
-                description=f"**Traits:**\n> {replace_html_tags(traits)}\n\n**Actions:**\n> {replace_html_tags(actions)}",
+                description=f"**Traits:**\n> {replace_html_tags(traits) or 'No traits lol'}\n\n**Actions:**\n> {replace_html_tags(actions)}",
             )  # move traits and actions to description for more space
             embed.set_thumbnail(url=img_url)
             embed.add_field(name="AC", value=armor_class, inline=True)
@@ -127,6 +135,11 @@ async def enemy(
                 value=replace_html_tags(legendary_actions),
                 inline=False,
             )
+            embed.add_field(name="Skills", value=monster["Skills"], inline=True)
+            embed.add_field(name="Languages", value=monster["Languages"], inline=True)
+            embed.add_field(name="Senses", value=monster["Senses"], inline=True)
+            embed.add_field(name="Challenge", value=challenge, inline=True)
+            
             await ctx.send(embeds=[embed])  # only send if we find a match
             return
     await ctx.send(f":warning: No enemy found with that name {enemy} :frog:")
