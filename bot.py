@@ -4,6 +4,7 @@ from typing import Literal
 from rolldice import roll_dice
 from random import randint
 import interactions, dotenv, os, re
+from battle_sim import Enemy, Player
 
 dotenv.load_dotenv()
 
@@ -17,7 +18,7 @@ spells_by_name = {}
 for spell in spells:
     spells_by_name[spell["name"].lower()] = spell
 
-alive_enemies = {}
+alive_combatants = []
 
 
 @bot.command(
@@ -52,12 +53,12 @@ async def roll(
     dice_notation: str,
     advantage: str = "None",
 ):
-
+    
     if advantage != "None":
-        (smaller_total, smaller_explanation), (
-            larger_total,
-            larger_explanation,
-        ) = sorted([roll_dice(dice_notation), roll_dice(dice_notation)])
+        (smaller_total, smaller_explanation), (larger_total, larger_explanation) = sorted(
+            [roll_dice(dice_notation), roll_dice(dice_notation)],
+            reverse=advantage == "Disadvantage"
+        )
         await ctx.send(
             f"""
 :game_die: {dice_notation} (With {advantage})
@@ -69,10 +70,6 @@ async def roll(
     else:
         total, explanation = roll_dice(dice_notation)
         await ctx.send(f":game_die: {dice_notation}\n{explanation} = {total}")
-
-
-data = possible_enemies
-
 
 def replace_html_tags(string):
     return (
@@ -94,8 +91,10 @@ def split_text(text):
 
     new_text = "\n\n".join([" ".join(chunk) for chunk in chunks])
 
-    return new_text
+    return ((((new_text))))
 
+def sort_combatants():
+    alive_combatants.sort(key=lambda combatant: combatant.initiative, reverse=True)
 
 @bot.command(
     name="stats",
@@ -107,7 +106,7 @@ async def enemy(
     ctx: interactions.CommandContext, enemy: str
 ):  # whats the point of spells 1 FRICK WE HAVE NO CANTRIPS nvm
 
-    for monster in data:
+    for monster in possible_enemies:
         if (
             monster["name"].lower() == enemy.lower()
         ):  # bad not work  lmaooooooooooooooooooooooo but I hat writing
@@ -140,10 +139,51 @@ async def enemy(
             embed.add_field(name="Languages", value=monster["Languages"], inline=True)
             embed.add_field(name="Senses", value=monster["Senses"], inline=True)
             embed.add_field(name="Challenge", value=challenge, inline=True)
-
+            
             await ctx.send(embeds=[embed])  # only send if we find a match
             return
     await ctx.send(f":warning: No enemy found with that name {enemy} :frog:")
+
+@bot.command(
+    name="enemy_from_race",
+    description="Spawns a new enemy of that race",
+    scope=1030231553386754188,
+)
+@interactions.option()
+@interactions.option()
+async def create_enemy(ctx: interactions.CommandContext, enemy_race: str, initiative: int):
+    alive_combatants.append(
+        enemy := Enemy.from_existing(enemy_race, initiative)
+    )
+    sort_combatants()
+    await ctx.send(f"Spawned new {enemy.name} ({enemy_race})")
+
+@bot.command(
+    name="initiative",
+    description="Roll Initiative!",
+    scope=1030231553386754188,
+)
+@interactions.option()
+@interactions.option()
+async def roll_initiative(ctx: interactions.CommandContext, bonus: int = 0, override: int = None):
+    alive_combatants.append(
+        Player(ctx.author, roll := (roll_dice(f"1d20 + {bonus}" if override is None else override)[0]))
+    )
+    sort_combatants()
+    await ctx.send(f"You rolled a {roll}!")
+
+@bot.command(
+    name="list_combatants",
+    description="Lists all combatants",
+    scope=1030231553386754188,
+)
+async def list_combatants(ctx: interactions.CommandContext):
+    PLAYER_FMT = "{initiative}: {name}"
+    ENEMY_FMT = "{initiative}: {name} ({race}) {fuzzy_health}"
+    if not alive_combatants:
+        await ctx.send("No combatants!")
+        return
+    await ctx.send("\n".join([PLAYER_FMT.format(**combatant.__dict__) if isinstance(combatant, Player) else ENEMY_FMT.format(**combatant.__dict__ | {"fuzzy_health": combatant.fuzzy_health}) for combatant in alive_combatants]))
 
 
 @bot.command(
