@@ -419,5 +419,22 @@ async def spell(ctx: interactions.CommandContext, spell_name: str):
     embed.add_field(name="School", value=school, inline=True)
     await ctx.send(embeds=[embed])
 
+@bot.command(
+    name="equipment",
+    description="returns an items value, stats, and traits",
+    scope=1030231553386754188,
+)
+@interactions.option()
+async def equipment(ctx: interactions.CommandContext, item_name:str):
+    pass
+
+@bot.command(
+    name="class",
+    description="returns dnd classes (and maybe subclasses/archetypes)",
+    scope=1030231553386754188,
+)
+@interactions.option()
+async def spell(ctx: interactions.CommandContext, item_name:str):
+    pass
 
 bot.start()
