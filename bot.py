@@ -2,9 +2,11 @@ import json
 from random import randint
 from typing import Literal
 from rolldice import roll_dice
+from dice import roll_min, roll_max
 from random import randint
 import interactions, dotenv, os, re
 from battle_sim import Enemy, Player
+from oztils import remove
 
 dotenv.load_dotenv()
 
@@ -16,6 +18,10 @@ player_stats = {
     "Ultrablob": {
         "health": 15,
         "armor_class": 15,
+    },
+    "ozzy": {
+        "health": 14,
+        "armor_class": 14,
     },
 }
 
@@ -58,6 +64,28 @@ dice_emoji = {
     "d8-6": "<:d8_6:1090768810849603605>",
     "d8-7": "<:d8_7:1090768810295955456>",
     "d8-8": "<:d8_8:1090768808370782220>",
+    "d10-1": "<:d10_1:1090768737197641728>",
+    "d10-2": "<:d10_2:1090768688308822087>",
+    "d10-3": "<:d10_3:1090768686870184067>",
+    "d10-4": "<:d10_4:1090768685473476628>",
+    "d10-5": "<:d10_5:1090768684315844678>",
+    "d10-6": "<:d10_6:1090768682604568677>",
+    "d10-7": "<:d10_7:1090768681191088258>",
+    "d10-8": "<:d10_8:1090768679899250768>",
+    "d10-9": "<:d10_9:1090768678750007306>",
+    "d10-10": "<:d10_10:1090768677110038641>",
+    "d12-1": "<:d12_1:1091092004190044233>",
+    "d12-2": "<:d12_2:1091092002889805965>",
+    "d12-3": "<:d12_3:1091092001732165653>",
+    "d12-4": "<:d12_4:1091092000016711700>",
+    "d12-5": "<:d12_5:1090768909147324436>",
+    "d12-6": "<:d12_6:1090768907901616238>",
+    "d12-7": "<:d12_7:1090768907012411474>",
+    "d12-8": "<:d12_8:1090768905343086774>",
+    "d12-9": "<:d12_9:1090768904151912479>",
+    "d12-10": "<:d12_10:1090768902910390373>",
+    "d12-11": "<:d12_11:1090768901626925056>",
+    "d12-12": "<:d12_12:1090768900171517982>",
     "d20-1": "<:d20_1:1090778219554279494>",
     "d20-2": "<:d20_2:1090778250244010024>",
     "d20-3": "<:d20_3:1090778217444548708>",
@@ -80,6 +108,16 @@ dice_emoji = {
     "d20-20": "<:d20_20:1090778319223533738>",
 }
 
+def autocomplete_from_list(ls):
+    async def autocomplete(ctx: interactions.CommandContext, value: str = ""):
+        await ctx.populate(
+            [
+                interactions.Choice(name=item, value=item)
+                for item in ls
+                if value.lower() in item.lower() or value == ""
+            ][:25] # only 25 options are allowed in the autocomplete
+        )
+    return autocomplete
 
 @bot.command(
     name="ping",
@@ -104,10 +142,16 @@ async def restart(ctx: interactions.CommandContext):
 
 def format_explanation(dice_notation: str, explanation: str):
     dice_type = re.findall(r"d\d+", dice_notation)[0]
-    return re.sub(
-        r"(?<=[\[\],])\d+",
-        lambda match: dice_emoji[f"{dice_type}-{match.group(0)}"] or match.group(0),
-        explanation,
+    return remove(
+        re.sub(
+            r"(?<=[\[\],])\d+",
+            lambda match: dice_emoji.get(
+                f"{dice_type}-{match.group(0)}", match.group(0)
+            )
+            or match.group(0),
+            explanation,
+        ),
+        "[,]",
     )
 
 
@@ -131,6 +175,7 @@ async def roll(
     dice_notation: str,
     advantage: str = "None",
 ):
+    min_roll, max_roll = int(roll_min(dice_notation)), int(roll_max(dice_notation))
     if advantage != "None":
         (smaller_total, smaller_explanation), (
             larger_total,
@@ -149,11 +194,7 @@ async def roll(
     else:
         total, explanation = roll_dice(dice_notation)
         await ctx.send(
-            embeds=[
-                interactions.Embed(
-                    description=f":game_die: {dice_notation}\n{format_explanation(dice_notation, explanation)} = {total}"
-                )
-            ]
+            f":game_die: {dice_notation} ({1 / (max_roll - min_roll):.3%} chance of any specific outcome)\n{format_explanation(dice_notation, explanation)} = {total}"
         )
 
 
@@ -190,7 +231,13 @@ def sort_combatants():
     description="returns an enemies stats",
     scope=1030231553386754188,
 )
-@interactions.option()
+@interactions.option(
+    name="enemy",
+    description="The enemy you want to see the stats of",
+    type=interactions.OptionType.STRING,
+    required=True,
+    autocomplete=True,  # i hate my life
+)
 async def enemy(
     ctx: interactions.CommandContext, enemy: str
 ):  # whats the point of spells 1 FRICK WE HAVE NO CANTRIPS nvm
@@ -243,6 +290,7 @@ async def enemy(
 @interactions.option()
 async def eval_(ctx: interactions.CommandContext, expression: str):
     await ctx.send(eval(expression))
+
 
 @bot.command(
     name="enemy_from_race",
@@ -378,7 +426,11 @@ async def damage_target_autocomplete(
     ctx: interactions.CommandContext, target_name: str = ""
 ):  # watching video on this lmao
     await ctx.populate(
-        [interactions.Choice(name=combatant.name, value=combatant.name) for combatant in combatants if combatant.health > 0] # this is terrible
+        [
+            interactions.Choice(name=combatant.name, value=combatant.name)
+            for combatant in combatants
+            if combatant.health > 0
+        ]  # this is terrible
     )  # go to battle_sim.py oh my god what the heck
 
 
@@ -387,7 +439,13 @@ async def damage_target_autocomplete(
     description="returns an spell's stats",
     scope=1030231553386754188,
 )
-@interactions.option()
+@interactions.option(
+    name="spell_name",
+    description="The name of the spell",
+    type=interactions.OptionType.STRING,
+    required=True,
+    autocomplete=True,
+)
 async def spell(ctx: interactions.CommandContext, spell_name: str):
     try:
         spell = spells_by_name[spell_name.lower()]  # bot off I think
@@ -419,14 +477,17 @@ async def spell(ctx: interactions.CommandContext, spell_name: str):
     embed.add_field(name="School", value=school, inline=True)
     await ctx.send(embeds=[embed])
 
+
+
 @bot.command(
     name="equipment",
     description="returns an items value, stats, and traits",
     scope=1030231553386754188,
 )
 @interactions.option()
-async def equipment(ctx: interactions.CommandContext, item_name:str):
+async def equipment(ctx: interactions.CommandContext, item_name: str):
     pass
+
 
 @bot.command(
     name="class",
@@ -434,7 +495,10 @@ async def equipment(ctx: interactions.CommandContext, item_name:str):
     scope=1030231553386754188,
 )
 @interactions.option()
-async def spell(ctx: interactions.CommandContext, item_name:str):
+async def spell(ctx: interactions.CommandContext, item_name: str):
     pass
+
+bot.autocomplete("stats", "enemy")(autocomplete_from_list([enemy["name"] for enemy in possible_enemies])) # have to define autocomplete after commands
+bot.autocomplete("spell", "spell_name")(autocomplete_from_list(list(spells_by_name.keys())))
 
 bot.start()
