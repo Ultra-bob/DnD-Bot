@@ -7,6 +7,7 @@ from random import randint
 import interactions, dotenv, os, re
 from battle_sim import Enemy, Player
 from oztils import remove
+from thefuzz import process, fuzz
 
 dotenv.load_dotenv()
 
@@ -109,13 +110,15 @@ dice_emoji = {
 }
 
 def autocomplete_from_list(ls):
-    async def autocomplete(ctx: interactions.CommandContext, value: str = ""):
+    async def autocomplete(ctx: interactions.CommandContext, query: str = ""):
+        nonlocal ls
+        if query != "":
+            ls = [i[0] for i in process.extract(query, ls, limit=25, scorer=fuzz.partial_ratio)] # only 25 options are allowed in the autocomplete
         await ctx.populate(
             [
                 interactions.Choice(name=item, value=item)
                 for item in ls
-                if value.lower() in item.lower() or value == ""
-            ][:25] # only 25 options are allowed in the autocomplete
+            ][:25]
         )
     return autocomplete
 
@@ -194,7 +197,7 @@ async def roll(
     else:
         total, explanation = roll_dice(dice_notation)
         await ctx.send(
-            f":game_die: {dice_notation} ({1 / (max_roll - min_roll):.3%} chance of any specific outcome)\n{format_explanation(dice_notation, explanation)} = {total}"
+            f":game_die: {dice_notation} ({1 / (max_roll - min_roll):%} chance of any specific outcome)\n{format_explanation(dice_notation, explanation)} = {total}"
         )
 
 
