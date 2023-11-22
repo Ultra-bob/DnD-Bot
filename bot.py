@@ -6,7 +6,7 @@ from dice import roll_min, roll_max
 from random import randint
 import interactions, dotenv, os, re
 from battle_sim import Enemy, Player
-from oztils import remove
+from oztils import remove, 
 from thefuzz import process, fuzz
 
 dotenv.load_dotenv()
@@ -197,7 +197,7 @@ async def roll(
     else:
         total, explanation = roll_dice(dice_notation)
         await ctx.send(
-            f":game_die: {dice_notation} ({1 / (max_roll - min_roll):%} chance of any specific outcome)\n{format_explanation(dice_notation, explanation)} = {total}"
+            f":game_die: {dice_notation} ({1 / max_roll:%} chance of any specific outcome)\n{format_explanation(dice_notation, explanation)} = {total}"
         )
 
 
